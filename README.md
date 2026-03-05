@@ -2,6 +2,11 @@
 
 Приложение для разделения аудиотреков на инструменты и конвертации в MIDI для Guitar Pro.
 
+**Сайт:** https://garanash.github.io/audioToGtp/
+
+> ⚠️ **Однократная настройка:** Если сайт не открывается, включите GitHub Pages:  
+> **Settings** → **Pages** → **Source:** Deploy from a branch → **Branch:** gh-pages → **/** (root)
+
 ## Архитектура
 
 - **Фронтенд:** React + TypeScript + Vite
