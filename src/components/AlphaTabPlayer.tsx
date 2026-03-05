@@ -74,7 +74,8 @@ export function AlphaTabPlayer({ file, tracks }: AlphaTabPlayerProps) {
 
   if (!source || !objectUrl) return null;
 
-  const playerUrl = `/alphatab-player.html?file=${encodeURIComponent(objectUrl)}`;
+  const base = import.meta.env.BASE_URL;
+  const playerUrl = `${base}alphatab-player.html?file=${encodeURIComponent(objectUrl)}`;
 
   return (
     <motion.div

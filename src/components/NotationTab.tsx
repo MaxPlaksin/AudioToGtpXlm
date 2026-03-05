@@ -85,7 +85,7 @@ export function NotationTab({ convertedTracks }: NotationTabProps) {
   const loadTestFile = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch('/sample.xml');
+      const res = await fetch(import.meta.env.BASE_URL + 'sample.xml');
       const blob = await res.blob();
       handleFile(new File([blob], 'sample.xml', { type: 'application/xml' }));
     } catch (e) {

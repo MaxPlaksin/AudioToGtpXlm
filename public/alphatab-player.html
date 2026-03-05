@@ -73,7 +73,8 @@
     </div>
   </div>
   <script type="module">
-    const ALPHATAB_BASE = '/alphatab';
+    const BASE = location.pathname.replace(/\/alphatab-player\.html.*$/, '/') || '/';
+    const ALPHATAB_BASE = BASE + (BASE.endsWith('/') ? 'alphatab' : '/alphatab');
     const SOUNDFONT = ALPHATAB_BASE + '/soundfont/sonivox.sf2';
     const LOAD_TIMEOUT_MS = 45000;
 
@@ -89,7 +90,7 @@
     const params = new URLSearchParams(location.search);
     let fileUrl = params.get('file');
     if (!fileUrl) {
-      fileUrl = '/sample.xml';
+      fileUrl = BASE + 'sample.xml';
       overlayContent.textContent = 'Загрузка тестового файла...';
     }
 
