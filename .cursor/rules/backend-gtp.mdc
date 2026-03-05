@@ -1,0 +1,26 @@
+---
+description: Правила для бэкенда конвертации MIDI в GTP. Следуй при работе с backend/ и API.
+globs: backend/**/*.py, **/api/**
+---
+
+# Бэкенд GTP Converter
+
+## Назначение
+Бэкенд используется только для конвертации MIDI → GTP. Формат Guitar Pro проприетарный, прямая конвертация в браузере затруднена.
+
+## Стек
+- FastAPI
+- guitarpro (Python)
+- CORS включен для localhost
+
+## API
+- `POST /api/convert-to-gtp` — принимает JSON с tracks (instrument, notes) и tempo, возвращает .gp5 файл
+- `GET /health` — проверка доступности
+
+## Запуск
+```bash
+cd backend && pip install fastapi uvicorn guitarpro && uvicorn main:app --reload
+```
+
+## Fallback
+Если бэкенд недоступен — отдавать пользователю MIDI с инструкцией по импорту в Guitar Pro.

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Нотная запись</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #0A0A0A; color: #E0E0E0; }
+    .at-wrap { display: flex; flex-direction: column; height: 100vh; min-height: 400px; }
+    .at-content { flex: 1; position: relative; overflow: hidden; }
+    .at-sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 60px; background: #1A1A1A; border-right: 1px solid #2A2A2A; overflow: hidden; transition: width 0.2s; z-index: 10; }
+    .at-sidebar:hover { width: 200px; overflow-y: auto; }
+    .at-viewport { position: absolute; top: 0; left: 60px; right: 0; bottom: 0; overflow: auto; padding: 16px; background: #fff; }
+    .at-main { min-height: 100%; }
+    .at-overlay { position: absolute; inset: 0; z-index: 100; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; }
+    .at-overlay-content { background: #111; border: 1px solid #2A2A2A; padding: 20px 24px; border-radius: 12px; color: #E0E0E0; display: flex; align-items: center; gap: 12px; }
+    .at-overlay-content::before { content: ''; width: 20px; height: 20px; border: 3px solid #8A2BE2; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .at-track-list { padding: 8px; }
+    .at-track { padding: 8px 12px; margin: 4px 0; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+    .at-track:hover { background: rgba(138,43,226,0.1); }
+    .at-track.active { background: rgba(138,43,226,0.2); }
+    .at-track-row { display: flex; align-items: center; gap: 10px; }
+    .at-track select { font-size: 11px; padding: 4px 6px; background: #2A2A2A; border: 1px solid #3A3A3A; color: #E0E0E0; border-radius: 6px; cursor: pointer; flex-shrink: 0; }
+    .at-track-icon { width: 36px; height: 36px; background: rgba(138,43,226,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #8A2BE2; flex-shrink: 0; }
+    .at-track-icon svg { width: 18px; height: 18px; }
+    .at-track-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .at-controls { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #1A1A1A; border-top: 1px solid #2A2A2A; flex-shrink: 0; }
+    .at-controls-left, .at-controls-right { display: flex; align-items: center; gap: 12px; }
+    .at-controls .btn { width: 44px; height: 44px; border: none; border-radius: 50%; background: transparent; color: #A0A0A0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .at-controls .btn:hover:not(.disabled) { background: rgba(138,43,226,0.2); color: #E0E0E0; }
+    .at-controls .btn.disabled { opacity: 0.4; cursor: not-allowed; }
+    .at-controls .btn.toggle.active { background: linear-gradient(135deg,#8A2BE2,#4B0082); color: #fff; }
+    .at-controls .btn svg { width: 18px; height: 18px; fill: currentColor; }
+    .at-song-position { font-family: monospace; font-size: 12px; color: #A0A0A0; }
+    .at-controls select { background: #2A2A2A; border: 1px solid #3A3A3A; color: #E0E0E0; padding: 8px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+    .at-cursor-bar { background: rgba(138,43,226,0.2); }
+    .at-cursor-beat { background: #8A2BE2; width: 3px; }
+    .at-highlight * { fill: #8A2BE2 !important; stroke: #8A2BE2 !important; }
+  </style>
+</head>
+<body>
+  <div class="at-wrap">
+    <div class="at-overlay" id="overlay">
+      <div class="at-overlay-content">Загрузка нотной записи...</div>
+    </div>
+    <div class="at-content">
+      <div class="at-sidebar">
+        <div class="at-track-list" id="trackList"></div>
+      </div>
+      <div class="at-viewport" id="viewport">
+        <div class="at-main" id="main"></div>
+      </div>
+    </div>
+    <div class="at-controls">
+      <div class="at-controls-left">
+        <button class="btn at-player-play-pause disabled" id="playBtn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+        <button class="btn at-player-stop disabled" id="stopBtn"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/></svg></button>
+        <span class="at-player-progress" id="progress">0%</span>
+        <button class="btn toggle at-count-in" id="countIn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></button>
+        <button class="btn toggle at-metronome" id="metronome"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></button>
+        <button class="btn toggle at-loop" id="loop"><svg viewBox="0 0 24 24"><path d="M17 1v4h4M7 23v-4H3M3 12a9 9 0 0118 0 9 9 0 01-18 0z"/><path d="M21 12a9 9 0 01-9 9"/></svg></button>
+        <span class="at-song-position" id="position">00:00 / 00:00</span>
+      </div>
+      <div class="at-controls-right">
+        <select id="zoom"><option value="25">25%</option><option value="50">50%</option><option value="75">75%</option><option value="90">90%</option><option value="100" selected>100%</option><option value="110">110%</option><option value="125">125%</option><option value="150">150%</option><option value="200">200%</option></select>
+        <select id="layout"><option value="horizontal" selected>Horizontal</option><option value="page">Page</option></select>
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#A0A0A0"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+        <input type="range" id="masterVol" min="0" max="100" value="100" style="width:80px" />
+        <span id="volVal">100%</span>
+      </div>
+    </div>
+  </div>
+  <script type="module">
+    const ALPHATAB_BASE = '/alphatab';
+    const SOUNDFONT = ALPHATAB_BASE + '/soundfont/sonivox.sf2';
+    const LOAD_TIMEOUT_MS = 45000;
+
+    const overlay = document.getElementById('overlay');
+    const overlayContent = overlay.querySelector('.at-overlay-content');
+
+    function showError(msg) {
+      overlayContent.textContent = msg;
+      overlayContent.style.color = '#ef4444';
+      overlay.style.display = 'flex';
+    }
+
+    const params = new URLSearchParams(location.search);
+    let fileUrl = params.get('file');
+    if (!fileUrl) {
+      fileUrl = '/sample.xml';
+      overlayContent.textContent = 'Загрузка тестового файла...';
+    }
+
+    const loadTimeout = setTimeout(() => {
+      showError('Таймаут загрузки. Попробуйте меньший файл или обновите страницу.');
+    }, LOAD_TIMEOUT_MS);
+
+    let alphaTab;
+    try {
+      alphaTab = await import(ALPHATAB_BASE + '/alphaTab.min.mjs');
+    } catch (e) {
+      clearTimeout(loadTimeout);
+      showError('Ошибка загрузки AlphaTab: ' + (e.message || e));
+      throw e;
+    }
+    const main = document.getElementById('main');
+    const viewport = document.getElementById('viewport');
+
+    let api;
+    try {
+      api = new alphaTab.AlphaTabApi(main, {
+      core: {
+        file: fileUrl,
+        useWorkers: false
+      },
+      player: {
+        enablePlayer: true,
+        soundFont: SOUNDFONT,
+        scrollElement: viewport,
+        enableCursor: true,
+        enableUserInteraction: true,
+        scrollMode: 1,
+        scrollOffsetX: 0,
+        scrollOffsetY: -30
+      },
+      display: {
+        layoutMode: alphaTab.LayoutMode.Horizontal,
+        staveProfile: 'default',
+        stretchForce: 0.8
+      }
+    });
+    } catch (e) {
+      clearTimeout(loadTimeout);
+      showError('Ошибка инициализации: ' + (e.message || e));
+      throw e;
+    }
+
+    api.renderStarted.on(() => { overlay.style.display = 'flex'; });
+    api.renderFinished.on(() => {
+      clearTimeout(loadTimeout);
+      overlay.style.display = 'none';
+    });
+    api.error.on?.((e) => {
+      clearTimeout(loadTimeout);
+      showError('Ошибка: ' + (e.message || e));
+    });
+
+    const playBtn = document.getElementById('playBtn');
+    const playIcon = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    const pauseIcon = '<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+
+    const trackList = document.getElementById('trackList');
+    const trackIcon = '<svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>';
+
+    const PROFILE_OPTIONS = [
+      { value: 'score', label: 'Ноты' },
+      { value: 'tab', label: 'Табы' },
+      { value: 'scoretab', label: 'Ноты+Табы' }
+    ];
+
+    function applyTrackProfile(track, profile) {
+      if (!track.staves || !track.staves.length) return;
+      const staff = track.staves[0];
+      staff.showStandardNotation = profile === 'score' || profile === 'scoretab';
+      staff.showTablature = profile === 'tab' || profile === 'scoretab';
+      api.updateSettings();
+      api.render();
+    }
+
+    api.scoreLoaded.on((score) => {
+      trackList.innerHTML = '';
+      score.tracks.forEach((track) => {
+        const el = document.createElement('div');
+        el.className = 'at-track';
+        el.dataset.index = track.index;
+        const select = document.createElement('select');
+        select.title = 'Вид нотации';
+        PROFILE_OPTIONS.forEach(opt => {
+          const o = document.createElement('option');
+          o.value = opt.value;
+          o.textContent = opt.label;
+          select.appendChild(o);
+        });
+        select.onchange = (e) => {
+          e.stopPropagation();
+          applyTrackProfile(track, select.value);
+        };
+        select.onclick = (e) => e.stopPropagation();
+        el.innerHTML = '<div class="at-track-row"><div class="at-track-icon">' + trackIcon + '</div><div class="at-track-name">' + track.name + '</div></div>';
+        el.appendChild(select);
+        el.onclick = (e) => { if (!e.target.closest('select')) api.renderTracks([track]); };
+        trackList.appendChild(el);
+      });
+    });
+
+    api.renderStarted.on(() => {
+      const rendered = new Map((api.tracks || []).map(t => [t.index, t]));
+      trackList.querySelectorAll('.at-track').forEach(el => {
+        el.classList.toggle('active', rendered.has(parseInt(el.dataset.index)));
+      });
+    });
+
+    const stopBtn = document.getElementById('stopBtn');
+    playBtn.onclick = () => { if (!playBtn.classList.contains('disabled')) api.playPause(); };
+    stopBtn.onclick = () => api.stop();
+    api.playerReady.on(() => {
+      playBtn.classList.remove('disabled');
+      stopBtn.classList.remove('disabled');
+      document.getElementById('progress').style.display = 'none';
+    });
+
+    api.playerStateChanged.on((e) => {
+      playBtn.innerHTML = e.state === alphaTab.synth.PlayerState.Playing ? pauseIcon : playIcon;
+    });
+
+    api.playerPositionChanged.on((e) => {
+      const fmt = ms => {
+        const s = Math.floor(ms/1000);
+        return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+      };
+      document.getElementById('position').textContent = fmt(e.currentTime) + ' / ' + fmt(e.endTime);
+    });
+
+    api.soundFontLoad.on((e) => {
+      document.getElementById('progress').textContent = Math.floor((e.loaded/e.total)*100) + '%';
+    });
+
+    document.getElementById('countIn').onclick = function() {
+      this.classList.toggle('active');
+      api.countInVolume = this.classList.contains('active') ? 1 : 0;
+    };
+    document.getElementById('metronome').onclick = function() {
+      this.classList.toggle('active');
+      api.metronomeVolume = this.classList.contains('active') ? 1 : 0;
+    };
+    document.getElementById('loop').onclick = function() {
+      this.classList.toggle('active');
+      api.isLooping = this.classList.contains('active');
+    };
+
+    document.getElementById('zoom').onchange = (e) => {
+      api.settings.display.scale = parseInt(e.target.value)/100;
+      api.updateSettings();
+      api.render();
+    };
+    document.getElementById('layout').onchange = (e) => {
+      api.settings.display.layoutMode = e.target.value === 'horizontal' ? alphaTab.LayoutMode.Horizontal : alphaTab.LayoutMode.Page;
+      api.updateSettings();
+      api.render();
+    };
+    document.getElementById('masterVol').oninput = (e) => {
+      api.masterVolume = parseInt(e.target.value)/100;
+      document.getElementById('volVal').textContent = e.target.value + '%';
+    };
+  </script>
+</body>
+</html>

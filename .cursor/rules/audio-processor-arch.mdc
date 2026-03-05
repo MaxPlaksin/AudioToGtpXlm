@@ -1,0 +1,77 @@
+---
+description: Архитектура приложения для обработки аудио с разделением на инструменты и конвертацией в GTP. Следуй этим правилам при создании компонентов обработки аудио.
+globs: *.tsx, *.ts, *.worker.ts
+---
+
+# Архитектура Audio-to-GTP процессора
+
+## 1. Общая архитектура
+Приложение работает преимущественно на стороне клиента (client-first), используя WebAssembly для тяжелых вычислений. Бэкенд используется только для: конвертации MIDI → GTP, аутентификации, хранения истории обработок.
+
+## 2. Интерфейсы для работы с аудио
+```typescript
+interface AudioFileUpload {
+  file: File;
+  buffer?: AudioBuffer;
+  duration: number;
+  waveform?: number[];
+  stems?: AudioStems;
+}
+
+interface AudioStems {
+  vocals?: AudioBuffer;
+  drums?: AudioBuffer;
+  bass?: AudioBuffer;
+  other?: AudioBuffer;
+  original: AudioBuffer;
+}
+```
+Поддерживаемые форматы: MP3, WAV, M4A/AAC, FLAC.
+
+## 3. Разделение на инструменты (demucs-web)
+- Используй demucs-web + onnxruntime-web. Модель скачивается с Hugging Face автоматически.
+- Кэшируй модель в IndexedDB после первой загрузки.
+- Вход: стерео 44100 Hz. Показывай прогресс загрузки и разделения.
+
+## 4. Конвертация в MIDI (Basic Pitch)
+Используй разные настройки для разных инструментов:
+- **vocals:** onsetThreshold: 0.7, minimumNoteLength: 80
+- **drums:** onsetThreshold: 0.3, minimumNoteLength: 30
+- **bass:** onsetThreshold: 0.5, minimumNoteLength: 100
+- **other:** onsetThreshold: 0.5, minimumNoteLength: 60
+
+## 5. Структура MidiTrackData
+```typescript
+interface MidiTrackData {
+  instrument: 'vocals' | 'drums' | 'bass' | 'other';
+  notes: Array<{ pitch: number; startTime: number; endTime: number; velocity: number }>;
+  program?: number;
+}
+```
+
+## 6. GTP экспорт
+- Вариант 1: Клиентский WASM (если есть).
+- Вариант 2: Через бэкенд FastAPI с guitarpro.
+- На первом этапе: отдавать MIDI + инструкцию по импорту в Guitar Pro.
+
+## 7. Multi-track плеер (howler.js)
+- Создавай Howl для каждой дорожки.
+- Регуляторы громкости для каждой дорожки.
+- Синхронизированное воспроизведение через seek(0).
+- Режим solo для изоляции дорожки.
+
+## 8. Управление состоянием
+Состояния: `idle` | `loading-model` | `separating` | `converting` | `ready` | `error`.
+Прогресс: 0-30% загрузка модели, 30-60% разделение, 60-100% конвертация.
+
+## 9. Производительность
+- Web Workers для CPU-интенсивных задач.
+- Transferable objects для передачи больших массивов.
+- Lazy loading моделей.
+- Кэширование моделей в IndexedDB.
+- Лимит размера файла: 100 МБ.
+
+## 10. Обработка ошибок
+- Out of memory: предложить уменьшить файл или серверную обработку.
+- Model not loaded: перезагрузить модель.
+- Всегда логировать и показывать пользователю понятное сообщение.

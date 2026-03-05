@@ -1,0 +1,293 @@
+/* AlphaTab Player — тёмная тема Moises.ai */
+
+.at-wrap-dark {
+  width: 100%;
+  min-height: 500px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: #111111;
+  border: 1px solid #2A2A2A;
+}
+
+.at-wrap-dark .at-content {
+  position: relative;
+  overflow: hidden;
+  flex: 1 1 auto;
+}
+
+.at-wrap-dark .at-sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 60px;
+  display: flex;
+  z-index: 10;
+  overflow: hidden;
+  border-right: 1px solid #2A2A2A;
+  background: #1A1A1A;
+  transition: width 0.2s;
+}
+
+.at-wrap-dark .at-sidebar:hover {
+  width: 220px;
+  overflow-y: auto;
+}
+
+.at-wrap-dark .at-sidebar-content {
+  width: 100%;
+  padding: 8px 0;
+}
+
+.at-wrap-dark .at-viewport {
+  overflow-y: auto;
+  overflow-x: auto;
+  position: absolute;
+  top: 0;
+  left: 60px;
+  right: 0;
+  bottom: 0;
+  padding: 16px;
+  background: #0A0A0A;
+}
+
+.at-wrap-dark .at-main {
+  min-height: 100%;
+}
+
+.at-wrap-dark .at-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.at-wrap-dark .at-overlay-content {
+  background: #111111;
+  border: 1px solid #2A2A2A;
+  padding: 20px 24px;
+  border-radius: 12px;
+  color: #E0E0E0;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.at-wrap-dark .at-overlay-content::before {
+  content: '';
+  width: 20px;
+  height: 20px;
+  border: 3px solid #8A2BE2;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: at-spin 0.8s linear infinite;
+}
+
+@keyframes at-spin {
+  to { transform: rotate(360deg); }
+}
+
+.at-wrap-dark .at-track-list {
+  padding: 4px 0;
+}
+
+.at-wrap-dark .at-track {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  margin: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.at-wrap-dark .at-track:hover {
+  background: rgba(138, 43, 226, 0.1);
+}
+
+.at-wrap-dark .at-track.active {
+  background: rgba(138, 43, 226, 0.2);
+}
+
+.at-wrap-dark .at-track-icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(138, 43, 226, 0.2);
+  border-radius: 50%;
+  color: #8A2BE2;
+  margin-right: 10px;
+}
+
+.at-wrap-dark .at-track-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.at-wrap-dark .at-track-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: #E0E0E0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.at-wrap-dark .at-track-volume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.at-wrap-dark .at-track-volume-slider {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #2A2A2A;
+  border-radius: 2px;
+}
+
+.at-wrap-dark .at-track-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #8A2BE2;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.at-wrap-dark .at-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #1A1A1A;
+  border-top: 1px solid #2A2A2A;
+  flex-shrink: 0;
+}
+
+.at-wrap-dark .at-controls-left,
+.at-wrap-dark .at-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.at-wrap-dark .at-controls .btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #A0A0A0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.at-wrap-dark .at-controls .btn:hover:not(.disabled) {
+  background: rgba(138, 43, 226, 0.2);
+  color: #E0E0E0;
+}
+
+.at-wrap-dark .at-controls .btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.at-wrap-dark .at-controls .btn.toggle.active {
+  background: linear-gradient(135deg, #8A2BE2, #4B0082);
+  color: white;
+}
+
+.at-wrap-dark .at-song-info {
+  margin: 0 12px;
+  min-width: 0;
+}
+
+.at-wrap-dark .at-song-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #E0E0E0;
+}
+
+.at-wrap-dark .at-song-position {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: #A0A0A0;
+}
+
+.at-wrap-dark .at-controls select {
+  appearance: none;
+  background: #2A2A2A;
+  border: 1px solid #3A3A3A;
+  color: #E0E0E0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.at-wrap-dark .at-volume-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.at-wrap-dark .at-volume-slider {
+  width: 80px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #2A2A2A;
+  border-radius: 2px;
+}
+
+.at-wrap-dark .at-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  background: #8A2BE2;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.at-wrap-dark .at-volume-value {
+  font-size: 12px;
+  color: #A0A0A0;
+  min-width: 36px;
+}
+
+/* AlphaTab cursor/selection (SVG) */
+.at-wrap-dark .at-cursor-bar {
+  background: rgba(138, 43, 226, 0.2);
+}
+
+.at-wrap-dark .at-cursor-beat {
+  background: #8A2BE2;
+  width: 3px;
+}
+
+.at-wrap-dark .at-selection div {
+  background: rgba(138, 43, 226, 0.15);
+}
+
+.at-wrap-dark .at-highlight * {
+  fill: #8A2BE2 !important;
+  stroke: #8A2BE2 !important;
+}
