@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/audioToGtp/',
+  base: process.env.VITE_BASE_PATH ?? '/audioToGtp/',
   plugins: [react()],
   server: {
     headers: {
