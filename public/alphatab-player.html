@@ -10,7 +10,7 @@
     .at-wrap { display: flex; flex-direction: column; height: 100vh; min-height: 400px; }
     .at-content { flex: 1; position: relative; overflow: hidden; }
     .at-sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 60px; background: #1A1A1A; border-right: 1px solid #2A2A2A; overflow: hidden; transition: width 0.2s; z-index: 10; }
-    .at-sidebar:hover { width: 200px; overflow-y: auto; }
+    .at-sidebar:hover { width: 260px; overflow-y: auto; }
     .at-viewport { position: absolute; top: 0; left: 60px; right: 0; bottom: 0; overflow: auto; padding: 16px; background: #fff; }
     .at-main { min-height: 100%; }
     .at-overlay { position: absolute; inset: 0; z-index: 100; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; }
@@ -26,6 +26,13 @@
     .at-track-icon { width: 36px; height: 36px; background: rgba(138,43,226,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #8A2BE2; flex-shrink: 0; }
     .at-track-icon svg { width: 18px; height: 18px; }
     .at-track-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .at-track-controls { display: flex; align-items: center; gap: 6px; }
+    .at-track-vol { flex: 1; min-width: 0; height: 6px; -webkit-appearance: none; background: #2A2A2A; border-radius: 3px; }
+    .at-track-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #8A2BE2; cursor: pointer; }
+    .at-track-btn { width: 24px; height: 24px; border: none; border-radius: 4px; background: #2A2A2A; color: #A0A0A0; font-size: 10px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .at-track-btn:hover { background: #3A3A3A; color: #E0E0E0; }
+    .at-track-btn.mute.active { background: #ef4444; color: #fff; }
+    .at-track-btn.solo.active { background: #8A2BE2; color: #fff; }
     .at-controls { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #1A1A1A; border-top: 1px solid #2A2A2A; flex-shrink: 0; }
     .at-controls-left, .at-controls-right { display: flex; align-items: center; gap: 12px; }
     .at-controls .btn { width: 44px; height: 44px; border: none; border-radius: 50%; background: transparent; color: #A0A0A0; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -170,12 +177,34 @@
       api.render();
     }
 
+    const trackStates = { volumes: {}, mutes: {}, solos: {} };
+
+    function applyTrackVolumes() {
+      if (!api.trackVolumes) return;
+      const vols = api.trackVolumes.slice();
+      api.score.tracks.forEach((t, i) => {
+        const idx = t.index;
+        const muted = trackStates.mutes[idx];
+        const soloActive = Object.values(trackStates.solos).some(Boolean);
+        const isSolo = trackStates.solos[idx];
+        if (muted) vols[idx] = 0;
+        else if (soloActive && !isSolo) vols[idx] = 0;
+        else vols[idx] = (trackStates.volumes[idx] ?? 1) * (api.trackVolumes[idx] ?? 1);
+      });
+      api.trackVolumes = vols;
+    }
+
     api.scoreLoaded.on((score) => {
       trackList.innerHTML = '';
       score.tracks.forEach((track) => {
+        const idx = track.index;
+        trackStates.volumes[idx] = 1;
+        trackStates.mutes[idx] = false;
+        trackStates.solos[idx] = false;
+
         const el = document.createElement('div');
         el.className = 'at-track';
-        el.dataset.index = track.index;
+        el.dataset.index = idx;
         const select = document.createElement('select');
         select.title = 'Вид нотации';
         PROFILE_OPTIONS.forEach(opt => {
@@ -191,7 +220,48 @@
         select.onclick = (e) => e.stopPropagation();
         el.innerHTML = '<div class="at-track-row"><div class="at-track-icon">' + trackIcon + '</div><div class="at-track-name">' + track.name + '</div></div>';
         el.appendChild(select);
-        el.onclick = (e) => { if (!e.target.closest('select')) api.renderTracks([track]); };
+
+        const controls = document.createElement('div');
+        controls.className = 'at-track-controls';
+        const volSlider = document.createElement('input');
+        volSlider.type = 'range';
+        volSlider.className = 'at-track-vol';
+        volSlider.min = 0;
+        volSlider.max = 100;
+        volSlider.value = 100;
+        volSlider.title = 'Громкость';
+        volSlider.oninput = (e) => {
+          e.stopPropagation();
+          trackStates.volumes[idx] = parseInt(volSlider.value) / 100;
+          applyTrackVolumes();
+        };
+        volSlider.onclick = (e) => e.stopPropagation();
+        const muteBtn = document.createElement('button');
+        muteBtn.className = 'at-track-btn mute';
+        muteBtn.textContent = 'M';
+        muteBtn.title = 'Выключить';
+        muteBtn.onclick = (e) => {
+          e.stopPropagation();
+          trackStates.mutes[idx] = !trackStates.mutes[idx];
+          muteBtn.classList.toggle('active', trackStates.mutes[idx]);
+          applyTrackVolumes();
+        };
+        const soloBtn = document.createElement('button');
+        soloBtn.className = 'at-track-btn solo';
+        soloBtn.textContent = 'S';
+        soloBtn.title = 'Соло';
+        soloBtn.onclick = (e) => {
+          e.stopPropagation();
+          trackStates.solos[idx] = !trackStates.solos[idx];
+          soloBtn.classList.toggle('active', trackStates.solos[idx]);
+          applyTrackVolumes();
+        };
+        controls.appendChild(volSlider);
+        controls.appendChild(muteBtn);
+        controls.appendChild(soloBtn);
+        el.appendChild(controls);
+
+        el.onclick = (e) => { if (!e.target.closest('select') && !e.target.closest('.at-track-controls')) api.renderTracks([track]); };
         trackList.appendChild(el);
       });
     });

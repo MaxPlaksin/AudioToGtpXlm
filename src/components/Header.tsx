@@ -5,7 +5,7 @@ export function Header() {
     <motion.header
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="border-b border-[#2A2A2A] bg-background/80 backdrop-blur-sm"
+      className="border-b border-[#2A2A2A] bg-[#0A0A0A]/80 backdrop-blur-sm"
     >
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-6">
         <div className="flex items-center justify-between">

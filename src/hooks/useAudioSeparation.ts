@@ -39,25 +39,48 @@ async function decodeBase64WavToBuffer(base64: string): Promise<AudioBuffer> {
   return ctx.decodeAudioData(bytes.buffer);
 }
 
+async function safeJson<T>(response: Response, fallback: T): Promise<T> {
+  const text = await response.text();
+  if (!text.trim()) return fallback;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 async function separateViaBackend(file: File): Promise<AudioStems | null> {
-  const res = await fetch(`${BACKEND_URL}/health`);
+  let res: Response;
+  try {
+    res = await fetch(`${BACKEND_URL}/health`);
+  } catch {
+    return null;
+  }
   if (!res.ok) return null;
-  const { demucs } = await res.json();
-  if (!demucs) return null;
+  const health = await safeJson<{ demucs?: boolean }>(res, {});
+  if (!health.demucs) return null;
 
   const form = new FormData();
   form.append('file', file);
 
-  const sepRes = await fetch(`${BACKEND_URL}/separate`, {
-    method: 'POST',
-    body: form,
-  });
+  let sepRes: Response;
+  try {
+    sepRes = await fetch(`${BACKEND_URL}/separate`, {
+      method: 'POST',
+      body: form,
+    });
+  } catch (e) {
+    throw new Error('Сервер недоступен. Запустите backend: npm run dev');
+  }
   if (!sepRes.ok) {
-    const err = await sepRes.json().catch(() => ({}));
+    const err = await safeJson<{ detail?: string }>(sepRes, {});
     throw new Error(err.detail ?? `Backend: ${sepRes.status}`);
   }
 
-  const data = (await sepRes.json()) as Record<string, string>;
+  const data = (await safeJson(sepRes, {})) as Record<string, string>;
+  const hasStems = Object.keys(data).some((k) => ['drums', 'bass', 'other', 'vocals', 'guitar', 'piano'].includes(k));
+  if (!hasStems) return null;
+
   const originalBuf = await fileToAudioBuffer(file);
   const stemsResult: AudioStems = { original: originalBuf };
 
@@ -163,26 +186,21 @@ export function useAudioSeparation(): UseAudioSeparationResult {
       setProgress(8);
 
       if (!processorRef.current) {
-        const [ortModule, demucsModule] = await Promise.all([
-          import('onnxruntime-web'),
-          import('demucs-web'),
-        ]);
-
+        const base = (typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL) || '/';
+        const basePath = base.endsWith('/') ? base : base + '/';
+        const origin = typeof location !== 'undefined' ? location.origin : '';
+        const ortModule = await import('onnxruntime-web/wasm');
         const ort = ortModule.default;
+        ort.env.wasm.wasmPaths = {
+          wasm: `${origin}${basePath}onnx-wasm/ort-wasm-simd-threaded.wasm`,
+          mjs: `${origin}${basePath}onnx-wasm/ort-wasm-simd-threaded.mjs`,
+        };
         const crossOriginIsolated = window.crossOriginIsolated ?? false;
         ort.env.wasm.numThreads = crossOriginIsolated
           ? Math.min(navigator.hardwareConcurrency || 4, 8)
           : 1;
-        if ('gpu' in navigator) {
-          try {
-            const adapter = await (navigator as Navigator & { gpu: GPU }).gpu.requestAdapter();
-            if (adapter) {
-              (ort.env as { webgpu?: object }).webgpu = { powerPreference: 'high-performance' };
-            }
-          } catch {
-            // WebGPU недоступен, используем WASM
-          }
-        }
+
+        const demucsModule = await import('demucs-web');
 
         const { DemucsProcessor } = demucsModule;
 
@@ -301,11 +319,14 @@ export function useAudioSeparation(): UseAudioSeparationResult {
         const fallback = createPlaceholderStems(fallbackBuffer);
         setStems(fallback);
         setProgress(100);
+        const isWasmError = /WASM|WebAssembly|magic word|initWasm/i.test(message);
         setError(
-          `${message} Показаны копии оригинала. Настройте backend (npm run setup) или загрузите готовые stems.`
+          isWasmError
+            ? 'Браузерная модель недоступна. Загрузите готовые stems или настройте backend: npm run setup'
+            : `${message} Показаны копии оригинала. Загрузите готовые stems или настройте backend.`
         );
         setSeparationWarning(
-          'Разделение не сработало. Убедитесь, что backend запущен (npm run dev) и Demucs установлен: npm run setup'
+          'Разделение не сработало. Варианты: 1) Загрузите готовые stems во вкладке «Конвертация в MIDI». 2) Запустите backend: npm run dev и npm run setup'
         );
         return fallback;
       } catch {
