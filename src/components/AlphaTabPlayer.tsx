@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 import type { MidiTrackData } from '../types/audio.types';
 import {
   midiTrackDataToMusicXml,
-  midiBufferToMusicXml,
+  midiBufferToMusicXmlData,
 } from '../utils/midiToMusicXml';
 
 const MIDI_EXT = /\.(mid|midi)$/i;
@@ -16,12 +16,25 @@ const MIDI_EXT = /\.(mid|midi)$/i;
 interface AlphaTabPlayerProps {
   file?: File | null;
   tracks?: MidiTrackData[] | null;
+  /** Темп воспроизведения (BPM). Для файла — переопределение; для tracks — темп звучания. */
+  tempo?: number;
+  /** Темп для раскладки нот (секунды → длительности). Если не задан, используется tempo — тогда смена темпа не меняет скорость воспроизведения для tracks. */
+  layoutTempo?: number;
+  /** Тональность (например "C", "Am", "F#"). */
+  keySignature?: string | null;
 }
 
-export function AlphaTabPlayer({ file, tracks }: AlphaTabPlayerProps) {
+export function AlphaTabPlayer({
+  file,
+  tracks,
+  tempo = 120,
+  layoutTempo,
+  keySignature = null,
+}: AlphaTabPlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const urlRef = useRef<string | null>(null);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [sourceTempo, setSourceTempo] = useState<number>(layoutTempo ?? tempo);
   const [error, setError] = useState<string | null>(null);
 
   const source = file ?? (tracks && tracks.length > 0 ? 'tracks' : null);
@@ -38,14 +51,24 @@ export function AlphaTabPlayer({ file, tracks }: AlphaTabPlayerProps) {
         if (file) {
           if (MIDI_EXT.test(file.name)) {
             const buf = await file.arrayBuffer();
-            const xml = await midiBufferToMusicXml(buf);
+            const { xml, sourceTempo: midiTempo } = await midiBufferToMusicXmlData(buf);
             blob = new Blob([xml], { type: 'application/xml' });
+            if (!cancelled) {
+              setSourceTempo(midiTempo);
+            }
           } else {
             blob = file;
+            if (!cancelled) {
+              setSourceTempo(tempo);
+            }
           }
         } else if (tracks && tracks.length > 0) {
-          const xml = midiTrackDataToMusicXml(tracks, 120);
+          const layout = layoutTempo ?? tempo;
+          const xml = midiTrackDataToMusicXml(tracks, layout, keySignature ?? null);
           blob = new Blob([xml], { type: 'application/xml' });
+          if (!cancelled) {
+            setSourceTempo(layout);
+          }
         } else {
           return;
         }
@@ -70,12 +93,16 @@ export function AlphaTabPlayer({ file, tracks }: AlphaTabPlayerProps) {
       if (prev) URL.revokeObjectURL(prev);
       setObjectUrl(null);
     };
-  }, [source, file, tracks]);
+  }, [source, file, tracks, tempo, layoutTempo, keySignature]);
 
   if (!source || !objectUrl) return null;
 
   const base = import.meta.env.BASE_URL;
-  const playerUrl = `${base}alphatab-player.html?file=${encodeURIComponent(objectUrl)}`;
+  const tempoParam = Math.max(20, Math.min(300, Math.round(tempo)));
+  const baseTempoParam = Math.max(20, Math.min(300, Math.round(sourceTempo || tempo)));
+  const playerUrl =
+    `${base}alphatab-player.html?file=${encodeURIComponent(objectUrl)}` +
+    `&tempo=${tempoParam}&baseTempo=${baseTempoParam}`;
 
   return (
     <motion.div

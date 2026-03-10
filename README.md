@@ -12,7 +12,7 @@
 - **Фронтенд:** React + TypeScript + Vite
 - **Стилизация:** Tailwind CSS + Framer Motion (дизайн Moises.ai)
 - **Разделение на инструменты:** Demucs (Python backend) — полная модель HTDemucs. Fallback: demucs-web в браузере
-- **Аудио → MIDI:** @spotify/basic-pitch (модель с CDN)
+- **Аудио → MIDI:** по умолчанию сервер (sound-to-midi, PyPI); при недоступности — Basic Pitch в браузере
 - **Плеер:** howler.js
 - **MIDI:** midi-writer-js
 
@@ -60,7 +60,7 @@ npm run build
 
 ## Детали
 
-1. **Demucs (качественное разделение):** `npm run setup` создаёт Python venv и устанавливает demucs-infer. Backend на порту 8000 используется автоматически при запуске `npm run dev`.
+1. **Demucs (качественное разделение):** Выполните `npm run setup` (создаёт `.venv` и устанавливает demucs-infer). Затем `npm run dev` — backend на порту 8000 запустится вместе с Vite. Redis и Celery по умолчанию отключены; разделение идёт синхронно.
 2. **Demucs (браузерный fallback):** Модель (~172 МБ) скачивается с Hugging Face и кэшируется в IndexedDB.
 2. **Basic Pitch:** Модель загружается с unpkg CDN автоматически.
 3. **COOP/COEP:** Требуются для SharedArrayBuffer (ONNX). Настроены в `vite.config.ts` для dev/preview. Для production добавьте заголовки на уровне сервера.

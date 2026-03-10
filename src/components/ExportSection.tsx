@@ -15,16 +15,18 @@ interface ExportSectionProps {
   stems: AudioStems;
   tracks: MidiTrackData[];
   baseFilename: string;
-  onExportAllMidi: () => void;
-  onExportTrackMidi: (track: MidiTrackData, filename: string) => void;
+  onExportGtp: () => Promise<unknown>;
+  onExportMidi: () => void;
+  gtpError?: string | null;
 }
 
 export function ExportSection({
   stems,
   tracks,
   baseFilename,
-  onExportAllMidi,
-  onExportTrackMidi,
+  onExportGtp,
+  onExportMidi,
+  gtpError,
 }: ExportSectionProps) {
   const stemKeys = (['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'] as StemType[]).filter(
     (k) => stems[k]
@@ -64,28 +66,32 @@ export function ExportSection({
         </div>
 
         <div>
-          <h4 className="mb-3 font-medium text-[#A0A0A0]">MIDI</h4>
+          <h4 className="mb-3 font-medium text-[#A0A0A0]">Нотная запись</h4>
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={onExportAllMidi}
-              className="rounded-full bg-gradient-to-r from-[#8A2BE2] to-[#4B0082] px-6 py-2.5 font-semibold text-white transition-all duration-300 hover:scale-105"
+              onClick={onExportGtp}
+              disabled={!tracks?.length}
+              className="rounded-full bg-gradient-to-r from-[#8A2BE2] to-[#4B0082] px-6 py-2.5 font-semibold text-white transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              Всё в одном файле
+              Скачать GTP (.gp5)
             </button>
-            {tracks.map((track) => (
-              <button
-                key={track.instrument}
-                onClick={() => onExportTrackMidi(track, `${baseFilename}-${track.instrument}.mid`)}
-                className="rounded-lg border border-[#2A2A2A] px-4 py-2 text-sm font-medium text-[#E0E0E0] transition-colors hover:border-[#8A2BE2] hover:text-[#8A2BE2]"
-              >
-                {STEM_LABELS[track.instrument]} (.mid)
-              </button>
-            ))}
+            <button
+              onClick={onExportMidi}
+              disabled={!tracks?.length}
+              className="rounded-lg border border-[#2A2A2A] px-4 py-2.5 font-medium text-[#E0E0E0] transition-colors hover:border-[#8A2BE2] hover:text-[#8A2BE2]"
+            >
+              MIDI
+            </button>
           </div>
+          {gtpError && (
+            <p className="mt-2 text-sm text-amber-400">
+              {gtpError}. Используйте MIDI и импортируйте в Guitar Pro: Файл → Импорт → MIDI
+            </p>
+          )}
+          <p className="mt-2 text-sm text-[#A0A0A0]">
+            GTP — нативный формат Guitar Pro. MIDI — универсальный, импорт: Файл → Импорт → MIDI
+          </p>
         </div>
-        <p className="text-sm text-[#A0A0A0]">
-          Импортируйте MIDI в Guitar Pro: Файл → Импорт → MIDI
-        </p>
       </div>
     </motion.div>
   );

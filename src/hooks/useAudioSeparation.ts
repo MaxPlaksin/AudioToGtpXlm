@@ -50,6 +50,33 @@ async function safeJson<T>(response: Response, fallback: T): Promise<T> {
   }
 }
 
+const POLL_INTERVAL_MS = 1500;
+const POLL_MAX_ATTEMPTS = 400; // ~10 min
+
+async function pollSeparateResult(taskId: string): Promise<Record<string, string>> {
+  for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
+    const statusRes = await fetch(`${BACKEND_URL}/separate/status/${taskId}`);
+    if (!statusRes.ok) continue;
+    const statusData = await safeJson<{ status?: string }>(statusRes, {});
+    if (statusData.status === 'completed') {
+      const resultRes = await fetch(`${BACKEND_URL}/separate/result/${taskId}`);
+      if (!resultRes.ok) throw new Error('Не удалось получить результат разделения');
+      return (await resultRes.json()) as Record<string, string>;
+    }
+    if (statusData.status === 'failed') {
+      throw new Error('Серверная задача разделения завершилась с ошибкой');
+    }
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+  }
+  throw new Error('Превышено время ожидания результата разделения');
+}
+
+function stemsFromData(data: Record<string, string>): boolean {
+  return Object.keys(data).some((k) =>
+    ['drums', 'bass', 'other', 'vocals', 'guitar', 'piano'].includes(k)
+  );
+}
+
 async function separateViaBackend(file: File): Promise<AudioStems | null> {
   let res: Response;
   try {
@@ -78,15 +105,20 @@ async function separateViaBackend(file: File): Promise<AudioStems | null> {
     throw new Error(err.detail ?? `Backend: ${sepRes.status}`);
   }
 
-  const data = (await safeJson(sepRes, {})) as Record<string, string>;
-  const hasStems = Object.keys(data).some((k) => ['drums', 'bass', 'other', 'vocals', 'guitar', 'piano'].includes(k));
-  if (!hasStems) return null;
+  const data = (await safeJson(sepRes, {})) as Record<string, string> | { taskId?: string; status?: string };
+
+  const taskId = typeof data?.taskId === 'string' ? data.taskId : null;
+  const dataStems = taskId
+    ? await pollSeparateResult(taskId)
+    : (data as Record<string, string>);
+
+  if (!stemsFromData(dataStems)) return null;
 
   const originalBuf = await fileToAudioBuffer(file);
   const stemsResult: AudioStems = { original: originalBuf };
 
   for (const name of ['drums', 'bass', 'other', 'vocals', 'guitar', 'piano'] as const) {
-    const b64 = data[name];
+    const b64 = dataStems[name];
     if (b64) {
       stemsResult[name] = await decodeBase64WavToBuffer(b64);
     }

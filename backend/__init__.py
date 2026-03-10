@@ -1,0 +1,1 @@
+# Backend: конвертация MIDI → GTP

@@ -192,3 +192,17 @@ export function audioBufferToWavBlob(audioBuffer: AudioBuffer): Blob {
 
   return new Blob([buffer], { type: 'audio/wav' });
 }
+
+/**
+ * Конвертирует AudioBuffer в WAV и возвращает base64-строку (для отправки на сервер sound-to-midi).
+ */
+export async function audioBufferToWavBase64(audioBuffer: AudioBuffer): Promise<string> {
+  const blob = audioBufferToWavBlob(audioBuffer);
+  const arrayBuffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}

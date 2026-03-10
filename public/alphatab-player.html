@@ -22,7 +22,8 @@
     .at-track:hover { background: rgba(138,43,226,0.1); }
     .at-track.active { background: rgba(138,43,226,0.2); }
     .at-track-row { display: flex; align-items: center; gap: 10px; }
-    .at-track select { font-size: 11px; padding: 4px 6px; background: #2A2A2A; border: 1px solid #3A3A3A; color: #E0E0E0; border-radius: 6px; cursor: pointer; flex-shrink: 0; }
+    .at-track select { font-size: 11px; padding: 4px 6px; background: #2A2A2A; border: 1px solid #3A3A3A; color: #E0E0E0; border-radius: 6px; cursor: pointer; flex-shrink: 0; min-width: 0; }
+    .at-track .at-track-instrument { width: 100%; margin-top: 4px; font-size: 11px; }
     .at-track-icon { width: 36px; height: 36px; background: rgba(138,43,226,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #8A2BE2; flex-shrink: 0; }
     .at-track-icon svg { width: 18px; height: 18px; }
     .at-track-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -72,7 +73,7 @@
       </div>
       <div class="at-controls-right">
         <select id="zoom"><option value="25">25%</option><option value="50">50%</option><option value="75">75%</option><option value="90">90%</option><option value="100" selected>100%</option><option value="110">110%</option><option value="125">125%</option><option value="150">150%</option><option value="200">200%</option></select>
-        <select id="layout"><option value="horizontal" selected>Horizontal</option><option value="page">Page</option></select>
+        <select id="layout"><option value="page" selected>Page</option><option value="horizontal">Horizontal</option></select>
         <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#A0A0A0"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
         <input type="range" id="masterVol" min="0" max="100" value="100" style="width:80px" />
         <span id="volVal">100%</span>
@@ -96,6 +97,8 @@
 
     const params = new URLSearchParams(location.search);
     let fileUrl = params.get('file');
+    const requestedBpm = parseFloat(params.get('tempo') || '0');
+    const baseBpm = parseFloat(params.get('baseTempo') || '0');
     if (!fileUrl) {
       fileUrl = BASE + 'sample.xml';
       overlayContent.textContent = 'Загрузка тестового файла...';
@@ -134,7 +137,7 @@
         scrollOffsetY: -30
       },
       display: {
-        layoutMode: alphaTab.LayoutMode.Horizontal,
+        layoutMode: alphaTab.LayoutMode.Page,
         staveProfile: 'default',
         stretchForce: 0.8
       }
@@ -152,8 +155,20 @@
     });
     api.error.on?.((e) => {
       clearTimeout(loadTimeout);
-      showError('Ошибка: ' + (e.message || e));
+      var msg = (e && e.message) ? String(e.message) : String(e);
+      if (msg.indexOf("staves") !== -1) {
+        console.warn('AlphaTab staves error (ignored):', msg);
+        return;
+      }
+      showError('Ошибка: ' + msg);
     });
+
+    function applyRequestedPlaybackTempo() {
+      if (!(requestedBpm > 0)) return;
+      const base = baseBpm > 0 ? baseBpm : (api.score && api.score.tempo > 0 ? api.score.tempo : 120);
+      const speed = requestedBpm / base;
+      api.playbackSpeed = Math.max(0.125, Math.min(8, speed));
+    }
 
     const playBtn = document.getElementById('playBtn');
     const playIcon = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
@@ -168,19 +183,71 @@
       { value: 'scoretab', label: 'Ноты+Табы' }
     ];
 
-    function applyTrackProfile(track, profile) {
-      if (!track.staves || !track.staves.length) return;
-      const staff = track.staves[0];
-      staff.showStandardNotation = profile === 'score' || profile === 'scoretab';
-      staff.showTablature = profile === 'tab' || profile === 'scoretab';
-      api.updateSettings();
-      api.render();
+    const GM_NAMES = new Map([
+      [0, 'Piano'], [1, 'Bright Piano'], [2, 'Electric Grand'], [3, 'Honky-tonk'], [4, 'Electric Piano 1'], [5, 'Electric Piano 2'],
+      [6, 'Harpsichord'], [7, 'Clavinet'], [8, 'Celesta'], [9, 'Glockenspiel'], [10, 'Music Box'], [11, 'Vibraphone'],
+      [12, 'Marimba'], [13, 'Xylophone'], [14, 'Tubular Bells'], [15, 'Dulcimer'], [16, 'Organ'], [17, 'Rock Organ'],
+      [18, 'Church Organ'], [19, 'Reed Organ'], [20, 'Accordion'], [21, 'Harmonica'], [22, 'Tango Accordion'],
+      [24, 'Acoustic Guitar'], [25, 'Nylon Guitar'], [26, 'Steel Guitar'], [27, 'Jazz Guitar'], [28, 'Clean Guitar'],
+      [29, 'Muted Guitar'], [30, 'Overdrive Guitar'], [31, 'Distortion Guitar'], [32, 'Guitar Harmonics'],
+      [33, 'Acoustic Bass'], [34, 'Finger Bass'], [35, 'Pick Bass'], [36, 'Fretless Bass'], [37, 'Slap Bass 1'],
+      [38, 'Slap Bass 2'], [39, 'Synth Bass 1'], [40, 'Synth Bass 2'], [41, 'Violin'], [42, 'Viola'],
+      [43, 'Cello'], [44, 'Contrabass'], [45, 'Tremolo Strings'], [46, 'Pizzicato'], [47, 'Orchestra Strings'],
+      [48, 'Timpani'], [49, 'String Ensemble 1'], [50, 'String Ensemble 2'], [51, 'Synth Strings 1'],
+      [52, 'Choir Aahs'], [53, 'Voice Oohs'], [54, 'Synth Choir'], [55, 'Orchestra Hit'], [56, 'Trumpet'],
+      [57, 'Trombone'], [58, 'Tuba'], [59, 'Muted Trumpet'], [60, 'French Horn'], [61, 'Brass Section'],
+      [62, 'Synth Brass 1'], [63, 'Synth Brass 2'], [64, 'Soprano Sax'], [65, 'Alto Sax'], [66, 'Tenor Sax'],
+      [67, 'Baritone Sax'], [68, 'Oboe'], [69, 'English Horn'], [70, 'Bassoon'], [71, 'Clarinet'],
+      [72, 'Piccolo'], [73, 'Flute'], [74, 'Recorder'], [75, 'Pan Flute'], [76, 'Blown Bottle'],
+      [77, 'Shakuhachi'], [78, 'Whistle'], [79, 'Ocarina'], [80, 'Lead 1'], [81, 'Lead 2'], [82, 'Lead 3'],
+      [83, 'Lead 4'], [84, 'Lead 5'], [85, 'Lead 6'], [86, 'Lead 7'], [87, 'Lead 8'],
+      [88, 'Pad 1'], [89, 'Pad 2'], [90, 'Pad 3'], [91, 'Pad 4'], [92, 'Pad 5'], [93, 'Pad 6'], [94, 'Pad 7'], [95, 'Pad 8'],
+      [96, 'FX 1'], [97, 'FX 2'], [98, 'FX 3'], [99, 'FX 4'], [100, 'FX 5'], [101, 'FX 6'], [102, 'FX 7'], [103, 'FX 8'],
+      [104, 'Sitar'], [105, 'Banjo'], [106, 'Shamisen'], [107, 'Koto'], [108, 'Kalimba'], [109, 'Bagpipe'],
+      [110, 'Fiddle'], [111, 'Shanai'], [112, 'Tinkle Bell'], [113, 'Agogo'], [114, 'Steel Drums'],
+      [115, 'Woodblock'], [116, 'Taiko'], [117, 'Melodic Tom'], [118, 'Synth Drum'], [119, 'Reverse Cymbal'],
+      [120, 'Guitar Fret Noise'], [121, 'Breath Noise'], [122, 'Seashore'], [123, 'Bird'], [124, 'Telephone'],
+      [125, 'Helicopter'], [126, 'Applause'], [127, 'Gunshot']
+    ]);
+
+    function getTrackByIndex(trackIndex) {
+      if (!api.score || !api.score.tracks) return null;
+      const byIdx = api.score.tracks[trackIndex];
+      if (byIdx && (byIdx.index === trackIndex || byIdx.index === undefined)) return byIdx;
+      return api.score.tracks.find(function (t) { return t.index === trackIndex; }) || null;
+    }
+
+    function getTracksWithStaves() {
+      if (!api.score || !api.score.tracks) return [];
+      return api.score.tracks.filter(function (t) { return t && t.staves && t.staves.length > 0; });
+    }
+
+    function applyTrackProfile(trackIndex, profile) {
+      try {
+        const track = getTrackByIndex(trackIndex);
+        if (!track) return;
+        const staves = track.staves;
+        if (!staves || !staves.length) return;
+        const staff = staves[0];
+        if (!staff) return;
+        staff.showStandardNotation = profile === 'score' || profile === 'scoretab';
+        staff.showTablature = profile === 'tab' || profile === 'scoretab';
+        api.updateSettings();
+        var tracksToRender = getTracksWithStaves();
+        if (tracksToRender.length > 0) {
+          api.renderTracks(tracksToRender);
+        } else {
+          api.render();
+        }
+      } catch (err) {
+        console.warn('applyTrackProfile:', err);
+      }
     }
 
     const trackStates = { volumes: {}, mutes: {}, solos: {} };
 
     function applyTrackVolumes() {
-      if (!api.trackVolumes) return;
+      if (!api.trackVolumes || !api.score || !api.score.tracks) return;
       const vols = api.trackVolumes.slice();
       api.score.tracks.forEach((t, i) => {
         const idx = t.index;
@@ -195,8 +262,10 @@
     }
 
     api.scoreLoaded.on((score) => {
+      setTimeout(applyRequestedPlaybackTempo, 50);
       trackList.innerHTML = '';
-      score.tracks.forEach((track) => {
+      (score.tracks || []).forEach((track) => {
+        if (!track) return;
         const idx = track.index;
         trackStates.volumes[idx] = 1;
         trackStates.mutes[idx] = false;
@@ -215,11 +284,35 @@
         });
         select.onchange = (e) => {
           e.stopPropagation();
-          applyTrackProfile(track, select.value);
+          applyTrackProfile(idx, select.value);
         };
         select.onclick = (e) => e.stopPropagation();
         el.innerHTML = '<div class="at-track-row"><div class="at-track-icon">' + trackIcon + '</div><div class="at-track-name">' + track.name + '</div></div>';
         el.appendChild(select);
+
+        const instrumentSelect = document.createElement('select');
+        instrumentSelect.className = 'at-track-instrument';
+        instrumentSelect.title = 'Инструмент для воспроизведения';
+        for (let i = 0; i < 128; i++) {
+          const o = document.createElement('option');
+          o.value = i;
+          o.textContent = GM_NAMES.get(i) || ('Program ' + i);
+          if (track.playbackInfo && track.playbackInfo.program === i) o.selected = true;
+          instrumentSelect.appendChild(o);
+        }
+        instrumentSelect.onchange = (e) => {
+          e.stopPropagation();
+          const program = parseInt(instrumentSelect.value, 10);
+          const currentTrack = getTrackByIndex(idx);
+          if (!currentTrack || !currentTrack.playbackInfo) return;
+          currentTrack.playbackInfo.program = program;
+          api.stop();
+          api.loadMidiForScore();
+          setTimeout(applyRequestedPlaybackTempo, 0);
+          applyTrackVolumes();
+        };
+        instrumentSelect.onclick = (e) => e.stopPropagation();
+        el.appendChild(instrumentSelect);
 
         const controls = document.createElement('div');
         controls.className = 'at-track-controls';
@@ -261,13 +354,18 @@
         controls.appendChild(soloBtn);
         el.appendChild(controls);
 
-        el.onclick = (e) => { if (!e.target.closest('select') && !e.target.closest('.at-track-controls')) api.renderTracks([track]); };
+        el.onclick = (e) => {
+          if (e.target.closest('select') || e.target.closest('.at-track-controls')) return;
+          const tr = getTrackByIndex(idx);
+          if (tr) api.renderTracks([tr]);
+        };
         trackList.appendChild(el);
       });
     });
 
     api.renderStarted.on(() => {
-      const rendered = new Map((api.tracks || []).map(t => [t.index, t]));
+      const tracks = (api.tracks || []).filter(function (t) { return t != null && t.staves != null; });
+      const rendered = new Map(tracks.map(function (t) { return [t.index, t]; }));
       trackList.querySelectorAll('.at-track').forEach(el => {
         el.classList.toggle('active', rendered.has(parseInt(el.dataset.index)));
       });
@@ -277,6 +375,7 @@
     playBtn.onclick = () => { if (!playBtn.classList.contains('disabled')) api.playPause(); };
     stopBtn.onclick = () => api.stop();
     api.playerReady.on(() => {
+      setTimeout(applyRequestedPlaybackTempo, 100);
       playBtn.classList.remove('disabled');
       stopBtn.classList.remove('disabled');
       document.getElementById('progress').style.display = 'none';

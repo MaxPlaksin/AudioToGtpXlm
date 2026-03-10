@@ -1,5 +1,6 @@
 /**
- * Утилиты для работы с MIDI
+ * Утилиты для работы с MIDI.
+ * Формат как в GP: первая дорожка — метаданные (темп, размер, тональность), далее по одной дорожке на инструмент.
  */
 
 import MidiWriter from 'midi-writer-js';
@@ -9,6 +10,8 @@ const STEM_TO_PROGRAM: Record<string, number> = {
   vocals: 52,
   drums: 0,
   bass: 33,
+  guitar: 25,
+  piano: 0,
   other: 0,
 };
 
@@ -26,17 +29,29 @@ function midiNoteToName(midiNote: number): string {
 }
 
 /**
- * Создаёт multi-track MIDI файл из дорожек
+ * Создаёт multi-track MIDI: первая дорожка — conductor (темп, размер, тональность), остальные — инструменты.
  */
 export function createMultiTrackMidi(
   tracks: MidiTrackData[],
-  tempo: number = 120
+  tempo: number = 120,
+  keySignature: string | null = null
 ): Blob {
-  const midiTracks: MidiWriter.Track[] = [];
+  const conductorTrack = new MidiWriter.Track();
+  conductorTrack.addTrackName('');
+  conductorTrack.setTempo(tempo);
+  conductorTrack.setTimeSignature(4, 4);
+  if (keySignature && keySignature.trim()) {
+    try {
+      (conductorTrack as unknown as { setKeySignature: (sf: string, mi?: number) => void }).setKeySignature(keySignature.trim());
+    } catch {
+      // ignore invalid key
+    }
+  }
+
+  const midiTracks: MidiWriter.Track[] = [conductorTrack];
 
   for (const trackData of tracks) {
     const track = new MidiWriter.Track();
-    track.setTempo(tempo);
     track.addTrackName(trackData.instrument);
     track.addInstrumentName(trackData.instrument);
 
@@ -78,13 +93,14 @@ export function createMultiTrackMidi(
 }
 
 /**
- * Создаёт single-track MIDI для одной дорожки
+ * Создаёт single-track MIDI для одной дорожки (с conductor-дорожкой).
  */
 export function createSingleTrackMidi(
   track: MidiTrackData,
-  tempo: number = 120
+  tempo: number = 120,
+  keySignature: string | null = null
 ): Blob {
-  return createMultiTrackMidi([track], tempo);
+  return createMultiTrackMidi([track], tempo, keySignature);
 }
 
 /**

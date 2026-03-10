@@ -8,6 +8,9 @@ import { AlphaTabPlayer } from './AlphaTabPlayer';
 import type { MidiTrackData } from '../types/audio.types';
 
 const NOTATION_EXTENSIONS = /\.(gp|gp3|gp4|gp5|gpx|gp7|gtp|mid|midi|xml|musicxml)$/i;
+const MIN_TEMPO = 20;
+const MAX_TEMPO = 300;
+const DEFAULT_TEMPO = 120;
 
 interface NotationTabProps {
   convertedTracks?: MidiTrackData[] | null;
@@ -15,6 +18,7 @@ interface NotationTabProps {
 
 export function NotationTab({ convertedTracks }: NotationTabProps) {
   const [notationFile, setNotationFile] = useState<File | null>(null);
+  const [tempo, setTempo] = useState(DEFAULT_TEMPO);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [userWantsUpload, setUserWantsUpload] = useState(false);
@@ -93,6 +97,16 @@ export function NotationTab({ convertedTracks }: NotationTabProps) {
     }
   }, [handleFile]);
 
+  const effectiveTempo = Math.min(MAX_TEMPO, Math.max(MIN_TEMPO, tempo));
+
+  const handleTempoChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = Number(e.target.value.trim());
+      if (!Number.isNaN(value)) setTempo(Math.round(value));
+    },
+    []
+  );
+
   if (showPlayer) {
     return (
       <motion.div
@@ -101,11 +115,25 @@ export function NotationTab({ convertedTracks }: NotationTabProps) {
         className="flex min-h-[calc(100vh-220px)] flex-col gap-4"
       >
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="text-sm text-[#A0A0A0]">
-            {hasFile
-              ? `Файл: ${notationFile!.name}`
-              : 'Показаны треки из конвертера'}
-          </p>
+          <div className="flex flex-wrap items-center gap-4">
+            <p className="text-sm text-[#A0A0A0]">
+              {hasFile
+                ? `Файл: ${notationFile!.name}`
+                : 'Показаны треки из конвертера'}
+            </p>
+            <label className="flex items-center gap-2 text-sm text-[#A0A0A0]">
+              <span>Темп, BPM:</span>
+              <input
+                type="number"
+                min={MIN_TEMPO}
+                max={MAX_TEMPO}
+                step={1}
+                value={effectiveTempo}
+                onChange={handleTempoChange}
+                className="w-20 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] px-3 py-1.5 text-[#E0E0E0] focus:border-[#8A2BE2] focus:outline-none"
+              />
+            </label>
+          </div>
           <button
             onClick={clearAndShowUpload}
             type="button"
@@ -116,9 +144,12 @@ export function NotationTab({ convertedTracks }: NotationTabProps) {
         </div>
         <div className="min-h-0 flex-1">
           {hasFile ? (
-            <AlphaTabPlayer file={notationFile} />
+            <AlphaTabPlayer file={notationFile} tempo={effectiveTempo} />
           ) : (
-            <AlphaTabPlayer tracks={convertedTracks!} />
+            <AlphaTabPlayer
+              tracks={convertedTracks!}
+              tempo={effectiveTempo}
+            />
           )}
         </div>
       </motion.div>
