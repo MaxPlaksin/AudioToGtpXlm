@@ -41,6 +41,7 @@ separated_demucs
 
 # Библиотека табулатур (локальная, не в репо)
 gtp_tabs/
+gtptabs.com.tar
 
 # Локальные данные сервера
 server/data/
